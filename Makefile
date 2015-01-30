@@ -45,9 +45,9 @@ LDFLAGS = $(MCFLAGS) $(DEBUG) -nostartfiles -T$(LINKER_FILE) -Wl,-Map=$(EXEC_FIL
 # Pliki źródłowe do kompilacji:
 SRC = ./src/main.c \
 ./vendor/system_stm32f0xx.c \
-./vendor/stm32f0xx_it.c \
 ./src/pt6961.c \
 ./src/delay.c \
+./src/interrupts.c \
 ./src/mini-printf.c \
 ./src/gpiopin.c
 
