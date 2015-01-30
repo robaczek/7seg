@@ -47,13 +47,16 @@ SRC = ./src/main.c \
 ./vendor/system_stm32f0xx.c \
 ./vendor/stm32f0xx_it.c \
 ./src/pt6961.c \
-./src/delay.c
+./src/delay.c \
+./src/mini-printf.c \
+./src/gpiopin.c
 
 # Ścieżki dołączanych plików nagłówkowych:
 INCLUDE_DIRS = ./include \
 	$(STM_ROOTDIR)/Libraries/CMSIS/Include \
 	$(STM_ROOTDIR)/Libraries/CMSIS/ST/STM32F0xx/Include \
-	$(STM_ROOTDIR)/Project/Demonstration
+	$(STM_ROOTDIR)/Project/Demonstration \
+	$(STM_ROOTDIR)/Libraries/STM32F0xx_StdPeriph_Driver/inc
 
 # Tworzenie parametrów dla kompilatora na podstawie listy katalogów:
 INCLUDES = $(patsubst %,-I%, $(INCLUDE_DIRS))
@@ -87,9 +90,10 @@ clean:
 	-rm -rf $(EXEC_FILE).map
 	-rm -rf $(EXEC_FILE).bin
 	-rm -rf $(SRC:.c=.lst)
-	-rm -rf $(ASRC:.s=.lst)
+	-rm -rf $(STARTUP_FILE:.s=.lst)
 
 flash: $(EXEC_FILE).bin
+	st-info --flash
 	st-flash write $(EXEC_FILE).bin $(FLASH_START)
 
 .PHONY: clean all
