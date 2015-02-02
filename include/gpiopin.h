@@ -14,6 +14,7 @@
 
 #define gpio_set(port, pin) port->BSRR = 1 << (pin)
 #define gpio_clear(port, pin) port->BRR = 1 << (pin)
+#define gpio_get(port, pin) ((!((port)->IDR & (1 << (pin)))))
 #define gpiopin_set(mypin) (mypin).port->BSRR = 1<<((mypin).pin)
 #define gpiopin_clear(mypin) (mypin).port->BRR = 1<<((mypin).pin)
 

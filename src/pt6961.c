@@ -119,6 +119,41 @@ unsigned char char2segment(unsigned char c)
     case 'F':
         data = DISP_A | DISP_G | DISP_F | DISP_E;
         break;
+
+    case 'P':
+    case 'p':
+        data = DISP_A | DISP_B | DISP_F | DISP_E | DISP_G;
+        break;
+
+    case 'R':
+    case 'r':
+        data = DISP_E | DISP_G;
+        break;
+
+    case 'O':
+    case 'o':
+        data = DISP_E | DISP_G | DISP_C | DISP_D;
+        break;
+
+    case 'G':
+    case 'g':
+        data = DISP_E | DISP_F | DISP_A | DISP_D | DISP_C;
+        break;
+
+    case 'I':
+    case 'i':
+        data = DISP_E;
+        break;
+
+    case 'S':
+    case 's':
+        data =  DISP_D | DISP_C | DISP_G | DISP_F | DISP_A;
+        break;
+
+    case '.':
+    case ',':
+        data = DISP_E;
+        break;
     case ' ':
     default:
         data = 0x00; // empty space
@@ -133,25 +168,16 @@ void pt6961_send(PT6961_Init* pt, unsigned char data)
     {
         if(data & 0x01)
         {
-            /* /\* set_gpio(pt->DIN_port, pt->DIN_pin); *\/ */
-            /* set_gpio(GPIOC,10); // DIN */
             gpiopin_set(pt->DIN);
         }
         else
         {
             gpiopin_clear(pt->DIN);
-            /* clear_gpio(pt->DIN_port, pt->DIN_pin); */
-            /* clear_gpio(GPIOC,10); // DIN */
         }
         data >>=0x01;
         /* blink clock */
         gpiopin_clear(pt->CLK);
         gpiopin_set(pt->CLK);
-        
-        /* clear_gpio(pt->CLK_port, pt->CLK_pin); */
-        /* clear_gpio(GPIOC,7); // CLK */
-        /* set_gpio(pt->CLK_port, pt->CLK_pin); */
-        /* set_gpio(GPIOC,7); //clk */
     }
 }
 
@@ -165,30 +191,18 @@ void pt6961_init(PT6961_Init* pt)
 
     /* Setting input mode for DOUT */
     pt->DOUT.port->MODER &= ~(1 << (pt->DOUT.pin*2));
-    /* GPIO_InitTypeDef GPIO_InitStructure; */
-    
-    /* GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN; */
-    /* GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP; */
-    /* GPIO_InitStructure.GPIO_Pin = pt->DOUT_pin; */
-    /* GPIO_Init(pt->DOUT_port, &GPIO_InitStructure); */
 
     gpiopin_clear(pt->DIN);
     gpiopin_set(pt->CLK);
     gpiopin_set(pt->STB);
-    /* clear_gpio(pt->DIN_port, pt->DIN_pin); // DIN */
-    /* set_gpio(pt->CLK_port, pt->CLK_pin); //clk */
-    /* set_gpio(pt->STB_port, pt->STB_pin); //stb */
 
     DelayMs(30);
 
     gpiopin_clear(pt->STB);
-    /* clear_gpio(pt->STB_port, pt->STB_pin); */
     pt6961_send(pt, 0b01000000);
     gpiopin_set(pt->STB);
-    /* set_gpio(pt->STB_port, pt->STB_pin); */
 
     gpiopin_clear(pt->STB);
-    /* clear_gpio(pt->STB_port, pt->STB_pin); */
     pt6961_send(pt, 0b11000000);
 
     unsigned char i;
@@ -197,25 +211,19 @@ void pt6961_init(PT6961_Init* pt)
         pt6961_send(pt, 0x0);
     }
     gpiopin_set(pt->STB);
-    /* set_gpio(pt->STB_port, pt->STB_pin); */
 
     gpiopin_clear(pt->STB);
-    /* clear_gpio(pt->STB_port, pt->STB_pin); */
     pt6961_send(pt, 0b00000010);
     gpiopin_set(pt->STB);
-    /* set_gpio(pt->STB_port, pt->STB_pin); */
 
     gpiopin_clear(pt->STB);
-    /* clear_gpio(pt->STB_port, pt->STB_pin); */
     pt6961_send(pt, 0b10001100);
     gpiopin_set(pt->STB);
-    /* set_gpio(pt->STB_port, pt->STB_pin); */
 }
 
 void pt6961_print(PT6961_Init* pt, const char* str)
 {
     gpiopin_clear(pt->STB);
-    /* clear_gpio(GPIOC,6);//stb */
     
     pt6961_send(pt, 0b01000000); // select write mode.
     pt6961_send(pt, 0b11000000); // set address to the beginning.
@@ -236,13 +244,11 @@ void pt6961_print(PT6961_Init* pt, const char* str)
     pt6961_send(pt, 0x00);
 
     gpiopin_set(pt->STB);
-    /* set_gpio(GPIOC,6);//stb */
 }
 
 void pt6961_update(PT6961_Init* pt)
 {
     gpiopin_clear(pt->STB);
-    /* clear_gpio(GPIOC,6);//stb */
     pt6961_send(pt, 0b01000000); // select write mode.
     pt6961_send(pt, 0b11000000); // set address to the beginning.
     
@@ -262,16 +268,12 @@ void pt6961_update(PT6961_Init* pt)
     pt6961_send(pt, 0x00);
 
     gpiopin_set(pt->STB);
-    
-    /* set_gpio(GPIOC,6);//stb */
 }
 
 uint32_t pt6961_read(PT6961_Init* pt)
 {
     gpiopin_clear(pt->STB);
-    /* clear_gpio(GPIOC,6); //stb */
     gpiopin_set(pt->CLK);
-    /* set_gpio(GPIOC,7); //clk */
     unsigned char data = 0;
     pt6961_send(pt, 0b01000110);
     delay(1000);
@@ -282,18 +284,13 @@ uint32_t pt6961_read(PT6961_Init* pt)
     for(j = 0; j < 8; j++)
     {
         gpiopin_clear(pt->CLK);
-        /* clear_gpio(GPIOC,7); //clk */
-            
-        data = (data << 1) | ((!(GPIOC->IDR & (1 << 12))) & 0x01);
-
+        //reads state of the pin.
+        data = (data << 1) | ((!(pt->DOUT.port->IDR & (1 << pt->DOUT.pin))) & 0x01);
         gpiopin_set(pt->CLK);
-        /* set_gpio(GPIOC,7); */
     }
-    /* data = (data << 2) >> 2; */
     data &= ~(0b00000011);
     gpiopin_set(pt->STB);
-    /* set_gpio(GPIOC, 6); */
-    if(data == KEY_NONE)
+    if(data == KEY_NONE || data == 0)
     {
         return 0;
     }

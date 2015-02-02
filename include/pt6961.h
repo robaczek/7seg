@@ -33,16 +33,6 @@ typedef struct strPT6961_Init
     GPIOPin DOUT;
     GPIOPin CLK;
     GPIOPin STB;
-    /*
-    GPIO_TypeDef * DIN_port;
-    uint32_t DIN_pin;
-    GPIO_TypeDef * DOUT_port;
-    uint32_t DOUT_pin;
-    GPIO_TypeDef * CLK_port;
-    uint32_t CLK_pin;
-    GPIO_TypeDef * STB_port;
-    uint32_t STB_pin;
-    */
     unsigned char value[PT_LEN+1];
     pt_keyhandler handler;
 } PT6961_Init;

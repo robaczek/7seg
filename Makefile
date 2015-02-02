@@ -46,7 +46,6 @@ LDFLAGS = $(MCFLAGS) $(DEBUG) -nostartfiles -T$(LINKER_FILE) -Wl,-Map=$(EXEC_FIL
 SRC = ./src/main.c \
 ./vendor/system_stm32f0xx.c \
 ./src/pt6961.c \
-./src/delay.c \
 ./src/interrupts.c \
 ./src/mini-printf.c \
 ./src/gpiopin.c
