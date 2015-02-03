@@ -17,11 +17,13 @@
 
 static __IO uint32_t DelayCounter; /* for busy wait */
 static __IO uint32_t phase_counter; /* for phase change */
+static __IO uint32_t blink_counter; /* for display blinking */
 static __IO uint32_t key_debouncer; /* for key presses management */
 
 
 #define PHASES 6
 #define BOUNCER 200
+#define BLINK_MS 300
 
 
 typedef struct strEngine
@@ -32,6 +34,7 @@ typedef struct strEngine
     uint32_t duration;
     unsigned char phase; /* 0-5, 60° phase */
     unsigned char direction; /* 1 - right, 0 - left */
+    unsigned char requested_direction;
     unsigned char started;
     unsigned char fault_overcurrent;
     
@@ -90,6 +93,15 @@ void DelayMs_Decrement(void)
     if(key_debouncer != 0)
     {
         key_debouncer--;
+    }
+
+    if(blink_counter == 0)
+    {
+        blink_counter = BLINK_MS;
+    }
+    else
+    {
+        blink_counter--;
     }
     
 }
@@ -182,12 +194,14 @@ unsigned char gpio_reader(GPIO_TypeDef* port, uint32_t pin)
 }
 
 #define ROT_MAX 1000
-#define ROT_MIN 10
+#define ROT_MIN 0
 
 void handle_menu(PT6961_Init* pt, unsigned char key)
 {
     char disp_mode_max = 9;
     char prog_mode_max = 2;
+    static uint32_t selected_rotation = 0;
+    static unsigned char selected_direction = 0;
     static unsigned char cur_id = 0; /* Current parameter ID. */
     static unsigned char mode = 0; /* Current mode. 0 - display, 1 - program */
     if(mode == 0)
@@ -200,7 +214,7 @@ void handle_menu(PT6961_Init* pt, unsigned char key)
             return;
 
         case KEY_UP:
-            if(cur_id < disp_mode_max -1)
+            if(cur_id < disp_mode_max)
                 cur_id++;
             else
                 cur_id = 0;
@@ -208,12 +222,16 @@ void handle_menu(PT6961_Init* pt, unsigned char key)
 
         case KEY_DOWN:
             if(cur_id == 0)
-                cur_id = disp_mode_max -1;
+                cur_id = disp_mode_max;
             else
                 cur_id--;
             break;
 
         case KEY_START:
+            if(engine.requested_rotation == 0)
+            {
+                engine.requested_rotation = selected_rotation;
+            }
             if(engine.requested_rotation > 0)
                 engine.started = 1;
             break;
@@ -221,6 +239,10 @@ void handle_menu(PT6961_Init* pt, unsigned char key)
         case KEY_STOP:
             engine.started = 0;
             engine.fault_overcurrent = 0;
+            break;
+            
+        case KEY_OK:
+            engine.requested_direction = !engine.requested_direction;
             break;
             
         default: /* KEY_NONE */
@@ -280,53 +302,159 @@ void handle_menu(PT6961_Init* pt, unsigned char key)
             {
                 snprintf(pt->value, PT_LEN+1, "%c%d%s", st, cur_id, "0");
             }
+            pt6961_update(pt);
+            break;
+        case 8: /* Direction */
+            snprintf(pt->value, PT_LEN+1, "%c%d%c", st, cur_id, engine.direction?'r':'l');
+            pt6961_update(pt);
             break;
 
+        case 9: /* Requested rotation */
+            snprintf(pt->value, PT_LEN+1, "%c%d%d", st, cur_id, engine.requested_rotation);
+            pt6961_update(pt);
+            break;
+            
         default:
             break;
         }
     }
-    else /* mode == 1 */
+    else /* mode == 1 (program) */
     {
-        switch(key)
-        {
-        case KEY_ESC:
-            mode = 0;
-            cur_id = 0;
-            return;
-        default:
-            break;
-            
-        }
+        static char program_mode = 0;
 
+        
         switch(cur_id)
         {
-        case 0:
-            (void*)0;
-            static uint32_t selected_rotation = 0;
-            snprintf(pt->value, PT_LEN+1, "p%d%d", cur_id, selected_rotation);
-            pt6961_update(pt);
-            switch(key)
+        case 0: /* set rotation */
+            if(blink_counter < BLINK_MS/2 || program_mode == 0)
             {
-            case KEY_UP:
-                if(selected_rotation < ROT_MAX)
-                    selected_rotation += 10;
-                break;
-            case KEY_DOWN:
-                if(selected_rotation > ROT_MIN)
+                snprintf(pt->value, PT_LEN+1, "p%d%d", cur_id, selected_rotation);
+            }
+            else
+            {
+                snprintf(pt->value, PT_LEN+1, "  %d", selected_rotation);
+            }
+            pt6961_update(pt);
+            if(program_mode)
+            {
+                switch(key)
                 {
-                    selected_rotation -= 10;
-                }
-                break;
-            case KEY_OK:
-                engine.requested_rotation = selected_rotation;
-                mode = 0;
-            default:
-                break;
+                case KEY_UP:
+                    if(selected_rotation < ROT_MAX)
+                        selected_rotation += 10;
+                    break;
+                case KEY_DOWN:
+                    if(selected_rotation > ROT_MIN)
+                    {
+                        selected_rotation -= 10;
+                    }
+                    break;
+                case KEY_OK:
+                    engine.requested_rotation = selected_rotation;
+                    program_mode = 0;
+                default:
+                    break;
                 
+                }
+            }
+            else
+            {
+            
+                switch(key)
+                {
+                case KEY_UP:
+                    if(cur_id < prog_mode_max-1)
+                        cur_id++;
+                    else
+                        cur_id = 0;
+                    break;
+
+                case KEY_DOWN:
+                    if(cur_id > 0)
+                        cur_id--;
+                    else
+                        cur_id = prog_mode_max - 1;
+                    break;
+                        
+                case KEY_OK:
+                    program_mode = 1;
+                    break;
+
+                case KEY_ESC:
+                    mode = 0;
+                    cur_id = 0;
+                    break;
+
+                default:
+                    break;
+                        
+                }
             }
             break;
+
+        case 1: /* set direction */
+            if(blink_counter < BLINK_MS/2 || program_mode == 0)
+            {
+                snprintf(pt->value, PT_LEN+1, "p%d%d", cur_id, selected_direction);
+            }
+            else
+            {
+                snprintf(pt->value, PT_LEN+1, "  %d", selected_direction);
+            }
+            pt6961_update(pt);
+            if(program_mode)
+            {
+                switch(key)
+                {
+                case KEY_UP:
+                case KEY_DOWN:
+                    selected_direction = !selected_direction;
+                    break;
+                case KEY_OK:
+                    engine.requested_direction = selected_direction;
+                    program_mode = 0;
+                default:
+                    break;
+                
+                }
+            }
+            else
+            {
+            
+                switch(key)
+                {
+                case KEY_UP:
+                    if(cur_id < prog_mode_max-1)
+                        cur_id++;
+                    else
+                        cur_id = 0;
+                    break;
+
+                case KEY_DOWN:
+                    if(cur_id > 0)
+                        cur_id--;
+                    else
+                        cur_id = prog_mode_max - 1;
+                    break;
+                        
+                case KEY_OK:
+                    program_mode = 1;
+                    break;
+
+                case KEY_ESC:
+                    mode = 0;
+                    cur_id = 0;
+                    break;
+
+                default:
+                    break;
+                        
+                }
+            }
+
+            break;
         }
+
     }
     
 }
@@ -341,7 +469,6 @@ int main(void)
     RCC->AHBENR |= RCC_AHBENR_GPIOAEN;
 
   
-	/* GPIOC->MODER |= (GPIO_MODER_MODER8_0 | GPIO_MODER_MODER9_0) ; */ /* for included leds */
     GPIOA->MODER &= ~(1 << (10*2)); /* set PA10 as input. */
     GPIOA->PUPDR |= GPIO_PUPDR_PUPDR10_0;
 
@@ -371,8 +498,15 @@ int main(void)
         /* if(!gpio_get(GPIOA, 10)) */
         /*     engine.fault_overcurrent = 1; */
         if(gpio_get(GPIOA, 10))
+        {
             engine.fault_overcurrent = 1;
+            engine.state = 3;
+        }
+        
         uint32_t data = key_handler(&pt, 0);
+        uint32_t inert_counter = 0;
+        static uint32_t rotation_before_reverse;
+        static unsigned char first_detected_reverse = 0;
         handle_menu(&pt, data);
         /* Control the engine state: */
         switch(engine.state)
@@ -381,12 +515,23 @@ int main(void)
             engine.phase = 0;
             engine.direction = 0;
             engine.rotation = 0;
+            engine.requested_direction = 0;
             engine.requested_rotation = 0;
             engine.started = 0;
             engine.fault_overcurrent = 0;
             engine.state = 1;
             break;
         case 1: /* engine ready */
+            if(engine.requested_direction !=  engine.direction)
+            {
+                if(!first_detected_reverse)
+                {
+                    rotation_before_reverse = engine.requested_rotation;
+                    first_detected_reverse = 1;
+                }
+                engine.state = 4;
+                break;
+            }
             if(engine.requested_rotation > 0 && engine.started == 1 && engine.fault_overcurrent == 0)
             {
                 engine.duration = 60000 / (engine.rotation * PHASES);
@@ -402,24 +547,67 @@ int main(void)
         case 2: /* engine rotating */
             if(engine.started == 0 || engine.fault_overcurrent == 1)
             {
-                engine.requested_rotation = 0;
+                /* engine.requested_rotation = 0; */
+                engine.rotation = 0;
             }
-            if(engine.rotation < engine.requested_rotation)
+            if(inert_counter == 0)
             {
-                engine.rotation++;
-                engine.state = 1;
+                if(engine.rotation < engine.requested_rotation)
+                {
+                    engine.rotation++;
+                    engine.state = 1;
+                }
+                if(engine.rotation > engine.requested_rotation)
+                {
+                    engine.rotation--;
+                    engine.state = 1;
+                }
+                if(engine.rotation != engine.requested_rotation && engine.rotation % 10 == 0)
+                    engine.state = 1;
+                inert_counter = 0;
             }
-            if(engine.rotation > engine.requested_rotation)
+            else
             {
-                engine.rotation--;
-                engine.state = 1;
+                inert_counter--;
             }
-            if(engine.rotation == 0)
+            if(engine.requested_direction !=  engine.direction)
             {
-                engine.state = 0;
-                engine.started = 0;
+                if(!first_detected_reverse)
+                {
+                    rotation_before_reverse = engine.requested_rotation;
+                    first_detected_reverse = 1;
+                }
+                engine.state = 4;
+                break;
             }
             break;
+
+        case 3: /* engine stopped */
+            engine.started = 0;
+            engine.requested_rotation = 0;
+            engine.rotation = 0;
+            engine.state = 1;
+            break;
+        case 4: /* engine needs to be reversed */
+            if(engine.rotation > 0)
+            {
+                engine.requested_rotation = 0;
+                engine.state = 2;
+            }
+            else
+            {
+                engine.direction = engine.requested_direction;
+                engine.requested_rotation = rotation_before_reverse;
+                engine.phase = 0;
+                engine.started = 1;
+                first_detected_reverse = 0;
+                engine.state = 2;
+            }
+            break;
+
+        default:
+            break;
+            
         }
 
         /* Change output pins configuration */

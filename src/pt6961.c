@@ -149,7 +149,10 @@ unsigned char char2segment(unsigned char c)
     case 's':
         data =  DISP_D | DISP_C | DISP_G | DISP_F | DISP_A;
         break;
-
+    case 'l':
+    case 'L':
+        data = DISP_E | DISP_F | DISP_D;
+        break;
     case '.':
     case ',':
         data = DISP_E;
