@@ -395,11 +395,11 @@ void handle_menu(PT6961_Init* pt, unsigned char key)
         case 1: /* set direction */
             if(blink_counter < BLINK_MS/2 || program_mode == 0)
             {
-                snprintf(pt->value, PT_LEN+1, "p%d%d", cur_id, selected_direction);
+                snprintf(pt->value, PT_LEN+1, "p%d%c", cur_id, selected_direction?'r':'l');
             }
             else
             {
-                snprintf(pt->value, PT_LEN+1, "  %d", selected_direction);
+                snprintf(pt->value, PT_LEN+1, "  %c", selected_direction?'r':'l');
             }
             pt6961_update(pt);
             if(program_mode)
